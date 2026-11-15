@@ -18,8 +18,7 @@ import numpy as np
 import pandas as pd
 import joblib
 import paho.mqtt.client as mqtt
-
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, Response, stream_with_context
 
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -63,7 +62,8 @@ model = None
 
 app = Flask(__name__)
 
-result_lock = threading.Lock()
+result_condition = threading.Condition()
+latest_version = 0
 
 latest_result = {
     "status": "WAITING",
@@ -72,7 +72,6 @@ latest_result = {
     "frames_processed": 0,
     "score": "--"
 }
-
 def train_model():
 
     print("\nTraining Isolation Forest model...")
@@ -235,14 +234,19 @@ def detect_anomaly(frames):
         except (ValueError, TypeError, OSError):
             timestamp = str(timestamp)
 
-        # Update dashboard result
-        with result_lock:
+        global latest_result, latest_version
+
+        with result_condition:
 
             latest_result["status"] = status
             latest_result["device_id"] = frame["device_id"]
             latest_result["timestamp"] = timestamp
             latest_result["score"] = round(score, 5)
             latest_result["frames_processed"] += 1
+
+            # Notify dashboard that new data has arrived
+            latest_version += 1
+            result_condition.notify_all()
 
         # Print result in terminal
         print("--------------------------------")
@@ -304,7 +308,6 @@ HTML = """
 <html>
 <head>
     <title>Anomaly Detection</title>
-    <meta http-equiv="refresh" content="2">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
