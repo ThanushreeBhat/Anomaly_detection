@@ -378,20 +378,39 @@ HTML = """
 
     </div>
 
-    <script>
-        const eventSource = new EventSource("/stream");
+    
+<script>
+    const statusElement = document.getElementById("status");
 
-        eventSource.onmessage = function(event) {
+    async function updateDashboard() {
+        try {
+            const response = await fetch("/api/result?t=" + Date.now(), {
+                cache: "no-store"
+            });
 
-            const data = JSON.parse(event.data);
+            if (!response.ok) {
+                throw new Error("Could not fetch result");
+            }
 
-            const status = document.getElementById("status");
+            const data = await response.json();
 
-            status.innerText = data.status;
-            status.className = data.status;
+            console.log("Latest prediction:", data.status);
 
-        };
-    </script>
+            statusElement.innerText = data.status;
+            statusElement.className = data.status;
+
+        } catch (error) {
+            console.error("Dashboard update error:", error);
+        }
+    }
+
+    // Update immediately
+    updateDashboard();
+
+    // Check for new predictions every second
+    setInterval(updateDashboard, 1000);
+</script>
+
 
 </body>
 </html>
