@@ -13,6 +13,7 @@ import json
 import base64
 import threading
 from datetime import datetime
+import uuid
 
 import numpy as np
 import pandas as pd
@@ -272,28 +273,37 @@ def on_connect(client, userdata, flags, reason_code, properties):
     print("SUBSCRIBED TO:", TOPIC, flush=True)
 
 
+
+import traceback
+
 def on_message(client, userdata, msg):
-    print("MESSAGE RECEIVED!", flush=True)
-    print("TOPIC:", msg.topic, flush=True)
-    print("PAYLOAD:", msg.payload[:100], flush=True)
-
-    print("\nNew MQTT message received!")
-
     try:
+        print("\n1. MESSAGE RECEIVED!", flush=True)
+        print("TOPIC:", msg.topic, flush=True)
 
-        # Decode and process payload
+        # Decode MQTT payload and extract frames
         frames = process_payload(msg.payload)
 
+        print("2. PAYLOAD PROCESSED", flush=True)
+        print("NUMBER OF FRAMES:", len(frames), flush=True)
+
         if not frames:
-            print("No valid frames found.")
+            print("NO VALID FRAMES FOUND!", flush=True)
             return
 
-        # Predict every frame
+        # Run Isolation Forest
+        print("3. STARTING ANOMALY DETECTION", flush=True)
         detect_anomaly(frames)
 
-    except Exception as error:
+        print("4. ANOMALY DETECTION COMPLETED", flush=True)
 
-        print("Error processing MQTT message:", error)
+        with result_condition:
+            print("5. LATEST RESULT:", latest_result, flush=True)
+
+    except Exception as error:
+        print("MESSAGE PROCESSING ERROR:", repr(error), flush=True)
+        traceback.print_exc()
+
 
 
 def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
@@ -445,7 +455,7 @@ def get_result():
 
     return jsonify(data)
 
-
+import uuid
 
 def start_mqtt():
 
@@ -458,11 +468,16 @@ def start_mqtt():
 
         print("ML model ready!", flush=True)
 
+        
+
         client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            client_id="charger-anomaly-detector"
+            client_id=f"charger-detector-{uuid.uuid4().hex[:8]}"
         )
-
+        client.reconnect_delay_set(
+            min_delay=1,
+            max_delay=30
+        )
         client.on_connect = on_connect
         client.on_message = on_message
         client.on_disconnect = on_disconnect
