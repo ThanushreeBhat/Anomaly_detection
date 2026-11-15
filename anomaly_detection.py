@@ -256,6 +256,13 @@ def detect_anomaly(frames):
         print("Result:", status)
         print("Anomaly score:", round(score, 5))
         print("--------------------------------")
+        print(
+    "PREDICTION PROCESS:",
+    os.getpid(),
+    "RESULT:",
+    latest_result,
+    flush=True
+)
 
 def on_connect(client, userdata, flags, reason_code, properties):
 
@@ -472,9 +479,16 @@ def get_result():
     with result_condition:
         data = latest_result.copy()
 
-    print("API SENDING RESULT:", data, flush=True)
+    print(
+        "API PROCESS:",
+        os.getpid(),
+        "RESULT:",
+        data,
+        flush=True
+    )
 
     return jsonify(data)
+    
 
 import uuid
 
