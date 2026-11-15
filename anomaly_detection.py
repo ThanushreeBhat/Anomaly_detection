@@ -356,13 +356,6 @@ HTML = """
             WAITING
         </div>
 
-        <div class="details">
-            <b>Device:</b> <span id="device">--</span><br>
-            <b>Timestamp:</b> <span id="timestamp">--</span><br>
-            <b>Frames processed:</b> <span id="frames">0</span><br>
-            <b>Score:</b> <span id="score">--</span>
-        </div>
-
         <p id="connection">Connecting...</p>
     </div>
 
