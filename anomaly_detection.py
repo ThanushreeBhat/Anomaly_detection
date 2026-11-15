@@ -273,6 +273,9 @@ def on_connect(client, userdata, flags, reason_code, properties):
 
 
 def on_message(client, userdata, msg):
+    print("MESSAGE RECEIVED!", flush=True)
+    print("TOPIC:", msg.topic, flush=True)
+    print("PAYLOAD:", msg.payload[:100], flush=True)
 
     print("\nNew MQTT message received!")
 
@@ -293,11 +296,13 @@ def on_message(client, userdata, msg):
         print("Error processing MQTT message:", error)
 
 
-def on_disconnect(
-    client, userdata, disconnect_flags, reason_code, properties
-):
-
-    print("MQTT disconnected:", reason_code)
+def on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
+    print(
+        "MQTT DISCONNECTED",
+        "Reason:", reason_code,
+        "Flags:", disconnect_flags,
+        flush=True
+    )
 
 HTML = """
 <!DOCTYPE html>
