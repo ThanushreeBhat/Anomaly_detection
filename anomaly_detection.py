@@ -298,105 +298,88 @@ def on_disconnect(
 
     print("MQTT disconnected:", reason_code)
 
-
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Anomaly Detection</title>
+    <title>Charger Monitoring</title>
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
         body {
-            font-family: Arial;
-            background: #f3f4f6;
-            text-align: center;
-            padding: 40px 15px;
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
         }
 
         .dashboard {
             background: white;
-            max-width: 450px;
-            margin: auto;
-            padding: 35px 20px;
+            padding: 50px;
             border-radius: 15px;
+            text-align: center;
             box-shadow: 0 3px 15px #ddd;
+            width: 300px;
         }
 
-        .status {
-            font-size: 36px;
+        h2 {
+            color: #333;
+        }
+
+        #status {
+            font-size: 32px;
             font-weight: bold;
-            margin: 30px;
+            margin-top: 35px;
         }
 
-        .NORMAL { color: green; }
-        .ANOMALY { color: red; }
-        .WAITING { color: orange; }
+        .NORMAL {
+            color: #16a34a;
+        }
 
-        .details {
-            background: #f8fafc;
-            padding: 15px;
-            text-align: left;
-            line-height: 2;
-            border-radius: 10px;
+        .ANOMALY {
+            color: #dc2626;
+        }
+
+        .WAITING {
+            color: #d97706;
         }
     </style>
 </head>
 
 <body>
+
     <div class="dashboard">
-        <h1>Anomaly Detection</h1>
-        <p>Live MQTT Monitoring</p>
 
-        <hr>
+        <h2>Charger Monitoring</h2>
 
-        <h3>Latest Result</h3>
-
-        <div id="status" class="status WAITING">
+        <div id="status" class="WAITING">
             WAITING
         </div>
 
-        <p id="connection">Connecting...</p>
     </div>
 
     <script>
         const eventSource = new EventSource("/stream");
 
-        eventSource.onopen = function() {
-            document.getElementById("connection").innerText =
-                "Live connection active";
-        };
-
         eventSource.onmessage = function(event) {
+
             const data = JSON.parse(event.data);
 
             const status = document.getElementById("status");
 
             status.innerText = data.status;
-            status.className = "status " + data.status;
+            status.className = data.status;
 
-            document.getElementById("device").innerText =
-                data.device_id;
-
-            document.getElementById("timestamp").innerText =
-                data.timestamp;
-
-            document.getElementById("frames").innerText =
-                data.frames_processed;
-
-            document.getElementById("score").innerText =
-                data.score;
-        };
-
-        eventSource.onerror = function() {
-            document.getElementById("connection").innerText =
-                "Reconnecting to live stream...";
         };
     </script>
+
 </body>
 </html>
-"""      
-  
+"""
 @app.route("/")
 def dashboard():
     return render_template_string(HTML)
