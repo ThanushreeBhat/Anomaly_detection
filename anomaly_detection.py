@@ -1,13 +1,13 @@
-import encodings
-import encodings.idna
-import codecs
+# import encodings
+# import encodings.idna
+# import codecs
 
-print("ENCODINGS PATH:", encodings.__file__, flush=True)
+# print("ENCODINGS PATH:", encodings.__file__, flush=True)
 
-try:
-    print("IDNA TEST:", codecs.lookup("idna"), flush=True)
-except Exception as e:
-    print("IDNA ERROR:", repr(e), flush=True)
+# try:
+#     print("IDNA TEST:", codecs.lookup("idna"), flush=True)
+# except Exception as e:
+#     print("IDNA ERROR:", repr(e), flush=True)
 import os
 import json
 import base64
@@ -299,74 +299,111 @@ def on_disconnect(
     print("MQTT disconnected:", reason_code)
 
 
-# =====================================================
-# 8. FLASK DASHBOARD
-# =====================================================
-
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Anomaly Detection</title>
+    <title>Charger Fault Detection</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Arial;
             background: #f3f4f6;
             text-align: center;
             padding: 40px 15px;
         }
+
         .dashboard {
             background: white;
             max-width: 450px;
             margin: auto;
             padding: 35px 20px;
             border-radius: 15px;
-            box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+            box-shadow: 0 3px 15px #ddd;
         }
-        h1 {
-            color: #222;
-            font-size: 25px;
-        }
-        .subtitle {
-            color: #777;
-        }
+
         .status {
             font-size: 36px;
             font-weight: bold;
-            margin: 30px 0;
+            margin: 30px;
         }
-        .NORMAL {
-            color: #16a34a;
-        }
-        .ANOMALY {
-            color: #dc2626;
-        }
-        .WAITING {
-            color: #d97706;
-        }
+
+        .NORMAL { color: green; }
+        .ANOMALY { color: red; }
+        .WAITING { color: orange; }
+
         .details {
             background: #f8fafc;
             padding: 15px;
-            border-radius: 10px;
             text-align: left;
             line-height: 2;
+            border-radius: 10px;
         }
     </style>
 </head>
+
 <body>
     <div class="dashboard">
-        <h1>Anomaly Detection</h1>
-        <p class="subtitle">Live MQTT Monitoring Dashboard</p>
+        <h1>Charger Fault Detection</h1>
+        <p>Live MQTT Monitoring</p>
+
         <hr>
+
         <h3>Latest Result</h3>
-        <div class="status {{ status }}">
-            {{ status }}
-        </div>       
+
+        <div id="status" class="status WAITING">
+            WAITING
+        </div>
+
+        <div class="details">
+            <b>Device:</b> <span id="device">--</span><br>
+            <b>Timestamp:</b> <span id="timestamp">--</span><br>
+            <b>Frames processed:</b> <span id="frames">0</span><br>
+            <b>Score:</b> <span id="score">--</span>
+        </div>
+
+        <p id="connection">Connecting...</p>
     </div>
+
+    <script>
+        const eventSource = new EventSource("/stream");
+
+        eventSource.onopen = function() {
+            document.getElementById("connection").innerText =
+                "Live connection active";
+        };
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            const status = document.getElementById("status");
+
+            status.innerText = data.status;
+            status.className = "status " + data.status;
+
+            document.getElementById("device").innerText =
+                data.device_id;
+
+            document.getElementById("timestamp").innerText =
+                data.timestamp;
+
+            document.getElementById("frames").innerText =
+                data.frames_processed;
+
+            document.getElementById("score").innerText =
+                data.score;
+        };
+
+        eventSource.onerror = function() {
+            document.getElementById("connection").innerText =
+                "Reconnecting to live stream...";
+        };
+    </script>
 </body>
 </html>
-"""
+"""      
+  
 @app.route("/")
 def dashboard():
     return render_template_string(HTML)
@@ -425,6 +462,75 @@ def get_result():
         data = latest_result.copy()
 
     return jsonify(data)
+
+# =====================================================
+# START MQTT BACKGROUND SERVICE
+# =====================================================
+
+def start_mqtt():
+
+    global model
+
+    try:
+        print("Loading ML model...", flush=True)
+
+        model = load_model()
+
+        print("ML model ready!", flush=True)
+
+        client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id="charger-anomaly-detector"
+        )
+
+        client.on_connect = on_connect
+        client.on_message = on_message
+        client.on_disconnect = on_disconnect
+
+        if USERNAME and PASSWORD:
+            client.username_pw_set(USERNAME, PASSWORD)
+
+        print("Connecting to MQTT broker...", flush=True)
+
+        client.connect(BROKER, PORT, keepalive=60)
+
+        print("Starting MQTT listener...", flush=True)
+
+        client.loop_forever()
+
+    except Exception as error:
+
+        print("MQTT STARTUP ERROR:", repr(error), flush=True)
+
+
+# =====================================================
+# START APPLICATION
+# =====================================================
+
+def start_background_services():
+
+    mqtt_thread = threading.Thread(
+        target=start_mqtt,
+        daemon=True
+    )
+
+    mqtt_thread.start()
+
+
+if __name__ == "__main__":
+
+    start_background_services()
+
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=False
+    )
+
+else:
+
+    # This executes when Gunicorn imports the Flask app
+    start_background_services()
 
 
 
