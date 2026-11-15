@@ -258,17 +258,18 @@ def detect_anomaly(frames):
 
 def on_connect(client, userdata, flags, reason_code, properties):
 
-    print("MQTT connection result:", reason_code)
+    print("MQTT RESULT:", reason_code, flush=True)
 
-    if getattr(reason_code, "is_failure", False):
-        print("MQTT connection failed.")
+    if reason_code.is_failure:
+        print("MQTT CONNECTION FAILED", flush=True)
         return
 
-    print("Connected to MQTT broker!")
+    print("CONNECTED TO MQTT!", flush=True)
 
-    client.subscribe(TOPIC, qos=1)
+    result, mid = client.subscribe(TOPIC, qos=1)
 
-    print("Subscribed to topic:", TOPIC)
+    print("SUBSCRIBE RESULT:", result, flush=True)
+    print("SUBSCRIBED TO:", TOPIC, flush=True)
 
 
 def on_message(client, userdata, msg):
@@ -302,7 +303,7 @@ HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Charger Monitoring</title>
+    <title>Anomaly Detection</title>
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -354,7 +355,7 @@ HTML = """
 
     <div class="dashboard">
 
-        <h2>Charger Monitoring</h2>
+        <h2>Anomaly Detection</h2>
 
         <div id="status" class="WAITING">
             WAITING
@@ -439,9 +440,7 @@ def get_result():
 
     return jsonify(data)
 
-# =====================================================
-# START MQTT BACKGROUND SERVICE
-# =====================================================
+
 
 def start_mqtt():
 
@@ -476,8 +475,11 @@ def start_mqtt():
 
     except Exception as error:
 
-        print("MQTT STARTUP ERROR:", repr(error), flush=True)
-
+        print(
+            "MQTT STARTUP ERROR:",
+            repr(error),
+            flush=True
+        )
 
 # =====================================================
 # START APPLICATION
