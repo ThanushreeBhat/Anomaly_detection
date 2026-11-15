@@ -472,6 +472,8 @@ def get_result():
     with result_condition:
         data = latest_result.copy()
 
+    print("API SENDING RESULT:", data, flush=True)
+
     return jsonify(data)
 
 import uuid
