@@ -303,7 +303,7 @@ HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Charger Fault Detection</title>
+    <title>Anomaly Detection</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
@@ -345,7 +345,7 @@ HTML = """
 
 <body>
     <div class="dashboard">
-        <h1>Charger Fault Detection</h1>
+        <h1>Anomaly Detection</h1>
         <p>Live MQTT Monitoring</p>
 
         <hr>
