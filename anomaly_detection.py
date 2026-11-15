@@ -559,11 +559,8 @@ if __name__ == "__main__":
         port=5000,
         debug=False
     )
+    
 
-else:
-
-    # This executes when Gunicorn imports the Flask app
-    start_background_services()
 
 
 
