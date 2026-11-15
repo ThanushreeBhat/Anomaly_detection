@@ -33,12 +33,12 @@ TOPIC = "lumetech/novalume/1/data"
 USERNAME = ""
 PASSWORD = ""
 
-CSV_FILE = "frames_summary.csv"
+JSONL_FILE = "charger_capture_20261115_200427.jsonl"
 MODEL_FILE = "model.pkl"
 
 # Set True only for the first run to train and save the model.
 # After model.pkl is created, change this to False.
-TRAIN_MODEL = False
+TRAIN_MODEL = True
 
 # Isolation Forest settings
 CONTAMINATION = 0.02
@@ -73,19 +73,57 @@ latest_result = {
     "frames_processed": 0,
     "score": "--"
 }
+
 def train_model():
 
-    print("\nTraining Isolation Forest model...")
+    print("\nTraining Isolation Forest from JSONL...")
 
-    if not os.path.exists(CSV_FILE):
+    if not os.path.exists(JSONL_FILE):
         raise FileNotFoundError(
-            f"{CSV_FILE} not found. Place it in the same folder."
+            f"{JSONL_FILE} not found!"
         )
 
-    df = pd.read_csv(CSV_FILE)
-    X = df[FEATURES].copy()
+    all_features = []
+
+    with open(JSONL_FILE, "r", encoding="utf-8") as file:
+
+        for line_number, line in enumerate(file, start=1):
+
+            try:
+                record = json.loads(line)
+
+                # Extract nested MQTT payload
+                payload = record["payload"]
+
+                if isinstance(payload, str):
+                    payload = payload.encode("utf-8")
+                elif isinstance(payload, dict):
+                    payload = json.dumps(payload).encode("utf-8")
+
+                # Decode and extract features
+                frames = process_payload(payload)
+
+                for frame in frames:
+                    all_features.append(frame["features"])
+
+            except Exception as error:
+                print(
+                    f"Error in line {line_number}: {error}",
+                    flush=True
+                )
+
+    if not all_features:
+        raise ValueError("No valid training frames found!")
+
+    X = pd.DataFrame(
+        all_features,
+        columns=FEATURES
+    )
 
     X = X.replace([np.inf, -np.inf], np.nan)
+
+    print("Training observations:", len(X))
+    print("Number of features:", len(FEATURES))
 
     pipeline = Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
@@ -98,19 +136,17 @@ def train_model():
     ])
 
     pipeline.fit(X)
+
     joblib.dump(pipeline, MODEL_FILE)
 
-    print("Model trained successfully!")
+    print("\nMODEL TRAINED SUCCESSFULLY!")
     print("Model saved as:", MODEL_FILE)
 
     predictions = pipeline.predict(X)
 
-    normal_count = np.sum(predictions == 1)
-    anomaly_count = np.sum(predictions == -1)
+    print("Normal:", np.sum(predictions == 1))
+    print("Anomalies:", np.sum(predictions == -1))
 
-    print("Training observations:", len(X))
-    print("Normal:", normal_count)
-    print("Anomalies flagged:", anomaly_count)
 
 def load_model():
 
@@ -492,33 +528,35 @@ def get_result():
 
 import uuid
 
+
 def start_mqtt():
 
     global model
 
     try:
+        if TRAIN_MODEL:
+            print("Training model first...", flush=True)
+            train_model()
+
         print("Loading ML model...", flush=True)
 
         model = load_model()
 
         print("ML model ready!", flush=True)
 
-        
-
         client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             client_id=f"charger-detector-{uuid.uuid4().hex[:8]}"
         )
+
         client.reconnect_delay_set(
             min_delay=1,
             max_delay=30
         )
+
         client.on_connect = on_connect
         client.on_message = on_message
         client.on_disconnect = on_disconnect
-
-        if USERNAME and PASSWORD:
-            client.username_pw_set(USERNAME, PASSWORD)
 
         print("Connecting to MQTT broker...", flush=True)
 
@@ -529,12 +567,8 @@ def start_mqtt():
         client.loop_forever()
 
     except Exception as error:
-
-        print(
-            "MQTT STARTUP ERROR:",
-            repr(error),
-            flush=True
-        )
+        print("MQTT STARTUP ERROR:", repr(error), flush=True)
+        traceback.print_exc()
 
 # =====================================================
 # START APPLICATION
