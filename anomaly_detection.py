@@ -367,86 +367,67 @@ HTML = """
 </body>
 </html>
 """
-
-
 @app.route("/")
 def dashboard():
+    return render_template_string(HTML)
 
-    with result_lock:
-        result = latest_result.copy()
 
-    return render_template_string(HTML, **result)
+@app.route("/stream")
+def stream():
+
+    def event_generator():
+
+        global latest_version
+
+        last_version = -1
+
+        while True:
+
+            with result_condition:
+
+                # Wait until a new prediction arrives
+                changed = result_condition.wait_for(
+                    lambda: latest_version != last_version,
+                    timeout=30
+                )
+
+                if changed:
+
+                    data = latest_result.copy()
+                    last_version = latest_version
+
+                else:
+                    data = None
+
+            if data is not None:
+
+                yield f"data: {json.dumps(data)}\n\n"
+
+            else:
+
+                # Keep the connection alive
+                yield ": keep-alive\n\n"
+
+    return Response(
+        stream_with_context(event_generator()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @app.route("/api/result")
 def get_result():
 
-    with result_lock:
-        result = latest_result.copy()
+    with result_condition:
+        data = latest_result.copy()
 
-    return jsonify(result)
+    return jsonify(data)
 
-def start_dashboard():
 
-    print("\nStarting dashboard...")
-    print("Open http://127.0.0.1:5000 in your browser")
 
-    app.run(
-        host="0.0.0.0",
-        port=5000,
-        debug=False,
-        use_reloader=False
-    )
 
-def main():
 
-    global model
-    if TRAIN_MODEL:
-        train_model()
 
-    model = load_model()
-    client = mqtt.Client(
-        callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-        client_id="charger-anomaly-detector"
-    )
-
-    if USERNAME and PASSWORD:
-        client.username_pw_set(USERNAME, PASSWORD)
-
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.on_disconnect = on_disconnect
-
-    dashboard_thread = threading.Thread(
-        target=start_dashboard,
-        daemon=True
-    )
-
-    dashboard_thread.start()
-
-    print("\nConnecting to MQTT broker...")
-
-    try:
-
-        client.connect(BROKER, PORT, keepalive=60)
-        client.loop_forever()
-
-    except KeyboardInterrupt:
-
-        print("\nProgram stopped.")
-
-    except Exception as error:
-
-        print("Connection error:", error)
-
-    finally:
-
-        client.disconnect()
-
-if __name__ == "__main__":
-    main()
-else:
-    threading.Thread(
-        target=main,
-        daemon=True
-    ).start()
