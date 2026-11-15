@@ -1,5 +1,7 @@
-pandas
-numpy
-scikit-learn
+flask
+gunicorn
 paho-mqtt
+numpy
+pandas
+scikit-learn
 joblib
