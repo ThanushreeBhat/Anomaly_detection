@@ -71,7 +71,9 @@ latest_result = {
     "device_id": "--",
     "timestamp": "--",
     "frames_processed": 0,
-    "score": "--"
+    "score": "--",
+    "voltage": "--",
+    "current": "--"
 }
 
 def train_model():
@@ -279,9 +281,12 @@ def detect_anomaly(frames):
             latest_result["device_id"] = frame["device_id"]
             latest_result["timestamp"] = timestamp
             latest_result["score"] = round(score, 5)
+
+            latest_result["voltage"] = round(features["vrms_v"], 2)
+            latest_result["current"] = round(features["irms_a"], 3)
+
             latest_result["frames_processed"] += 1
 
-            # Notify dashboard that new data has arrived
             latest_version += 1
             result_condition.notify_all()
 
@@ -367,45 +372,36 @@ HTML = """
 
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
 
-        .dashboard {
-            background: white;
-            padding: 50px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 3px 15px #ddd;
-            width: 300px;
-        }
+.dashboard {
+    background: white;
+    padding: 35px;
+    border-radius: 10px;
+    text-align: center;
+    width: 300px;
+}
 
-        h2 {
-            color: #333;
-        }
+#status {
+    font-size: 28px;
+    font-weight: bold;
+    margin: 25px 0;
+}
 
-        #status {
-            font-size: 32px;
-            font-weight: bold;
-            margin-top: 35px;
-        }
+.NORMAL { color: green; }
+.ANOMALY { color: red; }
+.WAITING { color: orange; }
 
-        .NORMAL {
-            color: #16a34a;
-        }
-
-        .ANOMALY {
-            color: #dc2626;
-        }
-
-        .WAITING {
-            color: #d97706;
-        }
+p {
+    font-size: 18px;
+}
     </style>
 </head>
 
@@ -415,9 +411,11 @@ HTML = """
 
         <h2>Anomaly Detection</h2>
 
-        <div id="status" class="WAITING">
-            WAITING
-        </div>
+        <div id="status" class="WAITING">WAITING</div>
+
+    <p>Voltage: <span id="voltage">--</span> V</p>
+
+    <p>Current: <span id="current">--</span> A</p>
 
     </div>
 
@@ -426,32 +424,28 @@ HTML = """
     const statusElement = document.getElementById("status");
 
     async function updateDashboard() {
-        try {
-            const response = await fetch("/api/result?t=" + Date.now(), {
-                cache: "no-store"
-            });
+    try {
+        const response = await fetch("/api/result?t=" + Date.now());
 
-            if (!response.ok) {
-                throw new Error("Could not fetch result");
-            }
-
-            const data = await response.json();
-
-            console.log("Latest prediction:", data.status);
-
-            statusElement.innerText = data.status;
-            statusElement.className = data.status;
-
-        } catch (error) {
-            console.error("Dashboard update error:", error);
+        if (!response.ok) {
+            throw new Error("Failed to fetch result");
         }
+
+        const data = await response.json();
+
+        document.getElementById("status").innerText = data.status;
+        document.getElementById("status").className = data.status;
+
+        document.getElementById("voltage").innerText = data.voltage;
+        document.getElementById("current").innerText = data.current;
+
+    } catch (error) {
+        console.log("Dashboard error:", error);
     }
+}
 
-    // Update immediately
-    updateDashboard();
-
-    // Check for new predictions every second
-    setInterval(updateDashboard, 1000);
+updateDashboard();
+setInterval(updateDashboard, 1000);
 </script>
 
 
